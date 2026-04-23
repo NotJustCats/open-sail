@@ -1,3 +1,6 @@
+import { geoGraticule10, geoOrthographic, geoPath } from "https://cdn.jsdelivr.net/npm/d3-geo@3/+esm";
+import { feature } from "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+
 const root = document.getElementById("globe-root");
 const statHeading = document.getElementById("stat-heading");
 const statSpeed = document.getElementById("stat-speed");
@@ -65,18 +68,15 @@ const state = {
   lastTick: performance.now(),
 };
 
-const otherBoats = [
-  { lat: 37.8, lon: -28.3, color: "#71c8ff" },
-  { lat: 14.6, lon: -56.2, color: "#77fca9" },
-  { lat: 26.1, lon: -38.2, color: "#d98eff" },
-];
 const trailPoints = [];
+let landGeometry = null;
 
 setupControls();
 updateStatPanel(0);
 drawWindVane();
 setupGlobeInteraction();
 resizeCanvas();
+loadLandGeometry();
 
 window.addEventListener("resize", () => {
   resizeCanvas();
@@ -372,6 +372,12 @@ function drawGlobe() {
   const cx = w * 0.5;
   const cy = h * 0.53;
   const radius = Math.min(w, h) * 0.34 * view.scale;
+  const projection = geoOrthographic()
+    .translate([cx, cy])
+    .scale(radius)
+    .rotate([radToDeg(-view.rotY), radToDeg(-view.tilt), 0])
+    .clipAngle(90);
+  const path = geoPath(projection, globeCtx);
 
   globeCtx.clearRect(0, 0, w, h);
   const bg = globeCtx.createRadialGradient(cx - radius * 0.4, cy - radius * 0.4, radius * 0.2, cx, cy, radius * 1.25);
@@ -382,13 +388,11 @@ function drawGlobe() {
   globeCtx.arc(cx, cy, radius, 0, Math.PI * 2);
   globeCtx.fill();
 
-  drawGrid(cx, cy, radius);
-  drawLand(cx, cy, radius);
-  drawTrail(cx, cy, radius);
-  drawBoatDot(cx, cy, radius, state.lat, state.lon, "#ffaf66", 4);
-  for (const boat of otherBoats) {
-    drawBoatDot(cx, cy, radius, boat.lat, boat.lon, boat.color, 3);
-  }
+  drawGrid(path);
+  drawLand(path);
+  drawTrail(projection);
+  drawPredictionLine(projection);
+  drawBoatDot(projection, state.lat, state.lon, "#ffaf66", 4);
 
   globeCtx.strokeStyle = "#4c78a8";
   globeCtx.globalAlpha = 0.75;
@@ -399,91 +403,78 @@ function drawGlobe() {
   globeCtx.globalAlpha = 1;
 }
 
-function drawGrid(cx, cy, radius) {
+function drawGrid(path) {
+  const graticule = geoGraticule10();
   globeCtx.strokeStyle = "rgba(86, 132, 185, 0.32)";
   globeCtx.lineWidth = 1;
-  for (let lat = -60; lat <= 60; lat += 20) {
-    const pts = [];
-    for (let lon = -180; lon <= 180; lon += 6) {
-      const p = project(lat, lon, cx, cy, radius);
-      if (p.visible) pts.push(p);
-    }
-    strokeProjected(pts);
-  }
-  for (let lon = -180; lon < 180; lon += 20) {
-    const pts = [];
-    for (let lat = -80; lat <= 80; lat += 4) {
-      const p = project(lat, lon, cx, cy, radius);
-      if (p.visible) pts.push(p);
-    }
-    strokeProjected(pts);
-  }
+  globeCtx.beginPath();
+  path(graticule);
+  globeCtx.stroke();
 }
 
-function drawLand(cx, cy, radius) {
-  const polys = landPolygons();
-  for (const poly of polys) {
-    const pts = poly.map((p) => project(p.lat, p.lon, cx, cy, radius)).filter((p) => p.visible);
-    if (pts.length < 3) continue;
-    globeCtx.fillStyle = "rgba(123, 146, 170, 0.88)";
-    globeCtx.strokeStyle = "rgba(194, 215, 236, 0.8)";
-    globeCtx.lineWidth = 1;
-    globeCtx.beginPath();
-    globeCtx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) globeCtx.lineTo(pts[i].x, pts[i].y);
-    globeCtx.closePath();
-    globeCtx.fill();
-    globeCtx.stroke();
-  }
+function drawLand(path) {
+  if (!landGeometry) return;
+  globeCtx.fillStyle = "rgba(128, 149, 170, 0.92)";
+  globeCtx.strokeStyle = "rgba(195, 214, 232, 0.76)";
+  globeCtx.lineWidth = 0.75;
+  globeCtx.beginPath();
+  path(landGeometry);
+  globeCtx.fill();
+  globeCtx.stroke();
 }
 
-function drawTrail(cx, cy, radius) {
+function drawTrail(projection) {
   if (trailPoints.length < 2) return;
   globeCtx.strokeStyle = "rgba(255, 175, 102, 0.8)";
   globeCtx.lineWidth = 1.2;
-  const visiblePts = trailPoints.map((p) => project(p.lat, p.lon, cx, cy, radius)).filter((p) => p.visible);
-  strokeProjected(visiblePts);
-}
-
-function drawBoatDot(cx, cy, radius, lat, lon, color, size) {
-  const p = project(lat, lon, cx, cy, radius);
-  if (!p.visible) return;
-  globeCtx.fillStyle = color;
   globeCtx.beginPath();
-  globeCtx.arc(p.x, p.y, size, 0, Math.PI * 2);
-  globeCtx.fill();
-}
-
-function strokeProjected(points) {
-  if (points.length < 2) return;
-  globeCtx.beginPath();
-  globeCtx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    globeCtx.lineTo(points[i].x, points[i].y);
+  let hasStarted = false;
+  for (const point of trailPoints) {
+    const p = projection([point.lon, point.lat]);
+    if (!p) {
+      hasStarted = false;
+      continue;
+    }
+    if (!hasStarted) {
+      globeCtx.moveTo(p[0], p[1]);
+      hasStarted = true;
+    } else {
+      globeCtx.lineTo(p[0], p[1]);
+    }
   }
   globeCtx.stroke();
 }
 
-function project(lat, lon, cx, cy, radius) {
-  const phi = degToRad(lat);
-  const theta = degToRad(lon) + view.rotY;
+function drawBoatDot(projection, lat, lon, color, size) {
+  const p = projection([lon, lat]);
+  if (!p) return;
+  globeCtx.fillStyle = color;
+  globeCtx.beginPath();
+  globeCtx.arc(p[0], p[1], size, 0, Math.PI * 2);
+  globeCtx.fill();
+}
 
-  let x = Math.cos(phi) * Math.cos(theta);
-  let y = Math.sin(phi);
-  let z = Math.cos(phi) * Math.sin(theta);
+function drawPredictionLine(projection) {
+  if (state.sog <= 0.05) return;
+  // 1-hour prediction assuming current wind/trim/heading stay unchanged.
+  const next = destinationPoint(state.lat, state.lon, state.heading, state.sog);
+  const start = projection([state.lon, state.lat]);
+  const end = projection([next.lon, next.lat]);
+  if (!start || !end) return;
 
-  const ct = Math.cos(view.tilt);
-  const st = Math.sin(view.tilt);
-  const y2 = y * ct - z * st;
-  const z2 = y * st + z * ct;
-  y = y2;
-  z = z2;
+  globeCtx.setLineDash([7, 6]);
+  globeCtx.strokeStyle = "rgba(113, 200, 255, 0.95)";
+  globeCtx.lineWidth = 1.5;
+  globeCtx.beginPath();
+  globeCtx.moveTo(start[0], start[1]);
+  globeCtx.lineTo(end[0], end[1]);
+  globeCtx.stroke();
+  globeCtx.setLineDash([]);
 
-  return {
-    x: cx + x * radius,
-    y: cy - y * radius,
-    visible: z > -0.08,
-  };
+  globeCtx.fillStyle = "#71c8ff";
+  globeCtx.beginPath();
+  globeCtx.arc(end[0], end[1], 3, 0, Math.PI * 2);
+  globeCtx.fill();
 }
 
 function degToRad(value) {
@@ -494,94 +485,35 @@ function radToDeg(value) {
   return (value * 180) / Math.PI;
 }
 
-function landPolygons() {
-  return [
-    // North America (very simplified mask)
-    [
-      { lat: 72, lon: -165 },
-      { lat: 62, lon: -140 },
-      { lat: 52, lon: -129 },
-      { lat: 45, lon: -124 },
-      { lat: 26, lon: -97 },
-      { lat: 11, lon: -82 },
-      { lat: 20, lon: -66 },
-      { lat: 35, lon: -76 },
-      { lat: 49, lon: -60 },
-      { lat: 61, lon: -78 },
-      { lat: 72, lon: -110 },
-    ],
-    // South America
-    [
-      { lat: 12, lon: -81 },
-      { lat: 8, lon: -76 },
-      { lat: -3, lon: -78 },
-      { lat: -16, lon: -74 },
-      { lat: -29, lon: -66 },
-      { lat: -42, lon: -63 },
-      { lat: -52, lon: -70 },
-      { lat: -55, lon: -77 },
-      { lat: -35, lon: -56 },
-      { lat: -10, lon: -48 },
-      { lat: 4, lon: -51 },
-    ],
-    // Europe + North Africa + Asia rough block
-    [
-      { lat: 70, lon: -10 },
-      { lat: 58, lon: 8 },
-      { lat: 52, lon: 28 },
-      { lat: 44, lon: 42 },
-      { lat: 36, lon: 35 },
-      { lat: 30, lon: 19 },
-      { lat: 23, lon: 11 },
-      { lat: 12, lon: -5 },
-      { lat: 8, lon: 12 },
-      { lat: 1, lon: 34 },
-      { lat: -9, lon: 41 },
-      { lat: -27, lon: 32 },
-      { lat: -34, lon: 19 },
-      { lat: -23, lon: 13 },
-      { lat: -2, lon: 4 },
-      { lat: 11, lon: 43 },
-      { lat: 19, lon: 65 },
-      { lat: 30, lon: 88 },
-      { lat: 41, lon: 104 },
-      { lat: 52, lon: 124 },
-      { lat: 62, lon: 142 },
-      { lat: 58, lon: 164 },
-      { lat: 48, lon: 149 },
-      { lat: 35, lon: 128 },
-      { lat: 23, lon: 118 },
-      { lat: 14, lon: 103 },
-      { lat: 5, lon: 101 },
-      { lat: -5, lon: 116 },
-      { lat: -9, lon: 130 },
-      { lat: 5, lon: 145 },
-      { lat: 24, lon: 134 },
-      { lat: 38, lon: 112 },
-      { lat: 50, lon: 91 },
-      { lat: 58, lon: 66 },
-      { lat: 62, lon: 43 },
-      { lat: 67, lon: 18 },
-    ],
-    // Australia
-    [
-      { lat: -12, lon: 113 },
-      { lat: -21, lon: 114 },
-      { lat: -34, lon: 116 },
-      { lat: -39, lon: 131 },
-      { lat: -35, lon: 147 },
-      { lat: -28, lon: 153 },
-      { lat: -18, lon: 147 },
-      { lat: -13, lon: 134 },
-    ],
-    // Greenland
-    [
-      { lat: 83, lon: -72 },
-      { lat: 78, lon: -45 },
-      { lat: 72, lon: -22 },
-      { lat: 61, lon: -40 },
-      { lat: 62, lon: -52 },
-      { lat: 70, lon: -62 },
-    ],
-  ];
+function destinationPoint(lat, lon, headingDeg, nauticalMiles) {
+  const earthRadiusNm = 3440.065;
+  const d = nauticalMiles / earthRadiusNm;
+  const brng = degToRad(headingDeg);
+  const lat1 = degToRad(lat);
+  const lon1 = degToRad(lon);
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng)
+  );
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
+      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
+    );
+
+  return {
+    lat: radToDeg(lat2),
+    lon: normalizeLon(radToDeg(lon2)),
+  };
+}
+
+async function loadLandGeometry() {
+  try {
+    const response = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json");
+    const topo = await response.json();
+    landGeometry = feature(topo, topo.objects.land);
+  } catch (_err) {
+    landGeometry = null;
+  }
 }
