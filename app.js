@@ -2,6 +2,13 @@ import { geoGraticule10, geoOrthographic, geoPath } from "https://cdn.jsdelivr.n
 import { feature } from "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
 
 const root = document.getElementById("globe-root");
+const mapStage = document.getElementById("map-stage");
+const globeViewBtn = document.getElementById("view-globe-btn");
+const localViewBtn = document.getElementById("view-local-btn");
+const helmPanel = document.getElementById("helm-panel");
+const helmToggleBtn = document.getElementById("helm-toggle");
+const globeView = document.getElementById("globe-root");
+const localViewCanvas = document.getElementById("local-map");
 const statHeading = document.getElementById("stat-heading");
 const statSpeed = document.getElementById("stat-speed");
 const statAppWind = document.getElementById("stat-app-wind");
@@ -20,7 +27,7 @@ const reefLevelSelect = document.getElementById("reef-level");
 const safetyModeSelect = document.getElementById("safety-mode");
 const vaneCanvas = document.getElementById("wind-vane");
 const vaneCtx = vaneCanvas.getContext("2d");
-const localCanvas = document.getElementById("local-map");
+const localCanvas = localViewCanvas;
 const localCtx = localCanvas.getContext("2d");
 const localZoomInput = document.getElementById("local-zoom");
 const localZoomReadout = document.getElementById("local-zoom-readout");
@@ -40,6 +47,7 @@ const view = {
   dragX: 0,
   dragY: 0,
 };
+let activeMapView = "globe";
 
 const FLICKA_20 = {
   hullSpeed: 5.95,
@@ -87,6 +95,7 @@ setupControls();
 updateStatPanel(0);
 drawWindVane();
 setupGlobeInteraction();
+setupLayoutControls();
 resizeCanvas();
 loadLandGeometry();
 
@@ -136,6 +145,28 @@ function setupControls() {
   localZoomInput.addEventListener("input", () => {
     localView.radiusKm = Number(localZoomInput.value) / 1000;
     localZoomReadout.textContent = `${localView.radiusKm.toFixed(2)} km`;
+  });
+}
+
+function setupLayoutControls() {
+  globeViewBtn.addEventListener("click", () => {
+    activeMapView = "globe";
+    globeView.classList.add("active");
+    localViewCanvas.classList.remove("active");
+    globeViewBtn.classList.add("active");
+    localViewBtn.classList.remove("active");
+    resizeCanvas();
+  });
+  localViewBtn.addEventListener("click", () => {
+    activeMapView = "local";
+    localViewCanvas.classList.add("active");
+    globeView.classList.remove("active");
+    localViewBtn.classList.add("active");
+    globeViewBtn.classList.remove("active");
+    resizeCanvas();
+  });
+  helmToggleBtn.addEventListener("click", () => {
+    helmPanel.classList.toggle("closed");
   });
 }
 
@@ -364,8 +395,8 @@ function normalizeLon(lon) {
 }
 
 function resizeCanvas() {
-  globeCanvas.width = root.clientWidth;
-  globeCanvas.height = root.clientHeight;
+  globeCanvas.width = mapStage.clientWidth;
+  globeCanvas.height = mapStage.clientHeight;
   localCanvas.width = Math.max(300, localCanvas.clientWidth * window.devicePixelRatio);
   localCanvas.height = Math.max(160, localCanvas.clientHeight * window.devicePixelRatio);
   localCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
@@ -396,6 +427,7 @@ function setupGlobeInteraction() {
 }
 
 function drawGlobe() {
+  if (activeMapView !== "globe") return;
   const w = globeCanvas.width;
   const h = globeCanvas.height;
   const cx = w * 0.5;
@@ -477,8 +509,10 @@ function drawTrail(projection) {
 function drawBoatIcon(projection, lat, lon, heading, color, size) {
   const p = projection([lon, lat]);
   if (!p) return;
+  const nose = projectionPointAhead(projection, lat, lon, heading, 0.5);
+  if (!nose) return;
   const ctx = globeCtx;
-  const angle = degToRad(heading - 90);
+  const angle = Math.atan2(nose[1] - p[1], nose[0] - p[0]);
   ctx.save();
   ctx.translate(p[0], p[1]);
   ctx.rotate(angle);
@@ -521,6 +555,7 @@ function drawPredictionLine(projection) {
 }
 
 function drawLocalMap() {
+  if (activeMapView !== "local") return;
   const w = localCanvas.clientWidth;
   const h = localCanvas.clientHeight;
   localCtx.clearRect(0, 0, w, h);
@@ -628,10 +663,15 @@ function drawWindArrow(ctx, x, y, dirDeg, color, label) {
 }
 
 function updateWeatherStrip() {
-  wxWind.textContent = `${Math.round(state.trueWindDir)}° / ${state.trueWindSpeed.toFixed(1)} kn`;
-  wxCurrent.textContent = `${Math.round(localView.currentDir)}° / ${localView.currentSpeed.toFixed(1)} kn`;
+  wxWind.textContent = `${Math.round(state.trueWindDir)}° ${state.trueWindSpeed.toFixed(1)} kn`;
+  wxCurrent.textContent = `${Math.round(localView.currentDir)}° ${localView.currentSpeed.toFixed(1)} kn`;
   const seaLevel = state.trueWindSpeed >= 22 ? "Rough" : state.trueWindSpeed >= 15 ? "Moderate" : "Calm";
   wxSea.textContent = seaLevel;
+}
+
+function projectionPointAhead(projection, lat, lon, headingDeg, nm) {
+  const ahead = destinationPoint(lat, lon, headingDeg, nm);
+  return projection([ahead.lon, ahead.lat]);
 }
 
 function degToRad(value) {

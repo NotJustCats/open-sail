@@ -20,17 +20,18 @@
         <section class="panel panel-main">
           <div class="panel-header">
             <h2>World View</h2>
-            <span>Wireframe + Shaded Land</span>
+            <div class="view-switch">
+              <button id="view-globe-btn" class="view-btn active">Globe</button>
+              <button id="view-local-btn" class="view-btn">Local</button>
+            </div>
           </div>
-          <div id="globe-root"></div>
-          <div class="panel-header local-header">
-            <h2>Local View</h2>
-            <span>Flat 0-1 km Tactical Map</span>
+          <div id="map-stage">
+            <div id="globe-root" class="map-view active"></div>
+            <canvas id="local-map" class="map-view" width="960" height="540"></canvas>
           </div>
-          <canvas id="local-map" width="960" height="260"></canvas>
         </section>
 
-        <section class="panel panel-side">
+        <section id="helm-panel" class="panel panel-side">
           <div class="panel-header">
             <h2>Flicka 20 Helm</h2>
             <span>Pacific Seacraft Model</span>
@@ -132,6 +133,7 @@
             </div>
           </div>
         </section>
+        <button id="helm-toggle" class="helm-toggle" aria-label="Toggle helm panel">Helm</button>
       </main>
     </div>
 
