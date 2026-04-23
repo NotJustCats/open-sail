@@ -20,6 +20,13 @@ const reefLevelSelect = document.getElementById("reef-level");
 const safetyModeSelect = document.getElementById("safety-mode");
 const vaneCanvas = document.getElementById("wind-vane");
 const vaneCtx = vaneCanvas.getContext("2d");
+const localCanvas = document.getElementById("local-map");
+const localCtx = localCanvas.getContext("2d");
+const localZoomInput = document.getElementById("local-zoom");
+const localZoomReadout = document.getElementById("local-zoom-readout");
+const wxWind = document.getElementById("wx-wind");
+const wxCurrent = document.getElementById("wx-current");
+const wxSea = document.getElementById("wx-sea");
 
 const globeCanvas = document.createElement("canvas");
 const globeCtx = globeCanvas.getContext("2d");
@@ -70,6 +77,11 @@ const state = {
 
 const trailPoints = [];
 let landGeometry = null;
+const localView = {
+  radiusKm: 0.35,
+  currentSpeed: 0,
+  currentDir: 0,
+};
 
 setupControls();
 updateStatPanel(0);
@@ -92,6 +104,7 @@ function animate() {
 
   runSimulationStep(deltaSec);
   drawGlobe();
+  drawLocalMap();
 }
 
 function setupControls() {
@@ -120,12 +133,19 @@ function setupControls() {
   safetyModeSelect.addEventListener("change", () => {
     state.safetyMode = safetyModeSelect.value;
   });
+  localZoomInput.addEventListener("input", () => {
+    localView.radiusKm = Number(localZoomInput.value) / 1000;
+    localZoomReadout.textContent = `${localView.radiusKm.toFixed(2)} km`;
+  });
 }
 
 function runSimulationStep(deltaSec) {
   const wind = windAt(state.lat, state.lon);
   state.trueWindDir = wind.direction;
   state.trueWindSpeed = wind.speed;
+  const current = currentAt(state.lat, state.lon);
+  localView.currentSpeed = current.speed;
+  localView.currentDir = current.direction;
 
   if (state.steerMode === "heading") {
     state.heading = moveTowardAngle(state.heading, state.targetHeading, deltaSec * 12);
@@ -166,6 +186,7 @@ function runSimulationStep(deltaSec) {
 
   const appWind = estimateApparentWind(twa, state.trueWindSpeed, state.sog);
   updateStatPanel(appWind.angle);
+  updateWeatherStrip();
   drawWindVane();
 }
 
@@ -233,6 +254,12 @@ function windAt(lat, lon) {
     direction: normalizeAngle(direction + variability * 3),
     speed: Math.max(6, speed + variability),
   };
+}
+
+function currentAt(lat, lon) {
+  const speed = 0.5 + Math.max(0, Math.sin((lat / 90) * Math.PI)) * 0.6;
+  const direction = normalizeAngle(250 + Math.sin((lon / 180) * Math.PI * 2) * 24);
+  return { speed, direction };
 }
 
 function interpolatePolar(angle, samples) {
@@ -339,6 +366,9 @@ function normalizeLon(lon) {
 function resizeCanvas() {
   globeCanvas.width = root.clientWidth;
   globeCanvas.height = root.clientHeight;
+  localCanvas.width = Math.max(300, localCanvas.clientWidth * window.devicePixelRatio);
+  localCanvas.height = Math.max(160, localCanvas.clientHeight * window.devicePixelRatio);
+  localCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
 }
 
 function setupGlobeInteraction() {
@@ -391,7 +421,7 @@ function drawGlobe() {
   drawLand(path);
   drawTrail(projection);
   drawPredictionLine(projection);
-  drawBoatDot(projection, state.lat, state.lon, "#ffaf66", 4);
+  drawBoatIcon(projection, state.lat, state.lon, state.heading, "#ffaf66", 13);
 
   globeCtx.strokeStyle = "#4c78a8";
   globeCtx.globalAlpha = 0.75;
@@ -444,13 +474,27 @@ function drawTrail(projection) {
   globeCtx.stroke();
 }
 
-function drawBoatDot(projection, lat, lon, color, size) {
+function drawBoatIcon(projection, lat, lon, heading, color, size) {
   const p = projection([lon, lat]);
   if (!p) return;
-  globeCtx.fillStyle = color;
-  globeCtx.beginPath();
-  globeCtx.arc(p[0], p[1], size, 0, Math.PI * 2);
-  globeCtx.fill();
+  const ctx = globeCtx;
+  const angle = degToRad(heading - 90);
+  ctx.save();
+  ctx.translate(p[0], p[1]);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "#001226";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.65, size * 0.46);
+  ctx.lineTo(-size * 0.65, -size * 0.46);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillRect(-size * 0.6, -size * 0.18, size * 0.56, size * 0.36);
+  ctx.restore();
 }
 
 function drawPredictionLine(projection) {
@@ -474,6 +518,120 @@ function drawPredictionLine(projection) {
   globeCtx.beginPath();
   globeCtx.arc(end[0], end[1], 3, 0, Math.PI * 2);
   globeCtx.fill();
+}
+
+function drawLocalMap() {
+  const w = localCanvas.clientWidth;
+  const h = localCanvas.clientHeight;
+  localCtx.clearRect(0, 0, w, h);
+
+  localCtx.fillStyle = "#091326";
+  localCtx.fillRect(0, 0, w, h);
+  drawLocalGrid(w, h);
+
+  const centerX = w * 0.5;
+  const centerY = h * 0.5;
+  drawWindArrow(localCtx, centerX + 120, centerY - 76, state.trueWindDir, "#ffb16d", "Wind");
+  drawWindArrow(localCtx, centerX + 120, centerY - 34, localView.currentDir, "#77fca9", "Current");
+
+  drawLocalPrediction(centerX, centerY);
+  drawLocalBoat(centerX, centerY, state.heading);
+
+  localCtx.fillStyle = "#7f97be";
+  localCtx.font = "11px Segoe UI";
+  localCtx.fillText(`Radius: ${(localView.radiusKm * 1000).toFixed(0)} m`, 10, h - 12);
+}
+
+function drawLocalGrid(w, h) {
+  localCtx.strokeStyle = "rgba(63, 96, 141, 0.35)";
+  localCtx.lineWidth = 1;
+  const step = 32;
+  for (let x = 0; x < w; x += step) {
+    localCtx.beginPath();
+    localCtx.moveTo(x, 0);
+    localCtx.lineTo(x, h);
+    localCtx.stroke();
+  }
+  for (let y = 0; y < h; y += step) {
+    localCtx.beginPath();
+    localCtx.moveTo(0, y);
+    localCtx.lineTo(w, y);
+    localCtx.stroke();
+  }
+}
+
+function drawLocalBoat(x, y, heading) {
+  const size = 15;
+  localCtx.save();
+  localCtx.translate(x, y);
+  localCtx.rotate(degToRad(heading - 90));
+  localCtx.fillStyle = "#ffaf66";
+  localCtx.strokeStyle = "#001226";
+  localCtx.lineWidth = 1.2;
+  localCtx.beginPath();
+  localCtx.moveTo(size, 0);
+  localCtx.lineTo(-size * 0.65, size * 0.48);
+  localCtx.lineTo(-size * 0.65, -size * 0.48);
+  localCtx.closePath();
+  localCtx.fill();
+  localCtx.stroke();
+  localCtx.fillStyle = "rgba(255,255,255,0.84)";
+  localCtx.fillRect(-size * 0.56, -size * 0.18, size * 0.52, size * 0.36);
+  localCtx.restore();
+}
+
+function drawLocalPrediction(centerX, centerY) {
+  const safeRadiusKm = Math.max(0.001, localView.radiusKm);
+  const distanceKm = (state.sog * 1.852) * 1; // 1 hour prediction.
+  const pxPerKm = (Math.min(localCanvas.clientWidth, localCanvas.clientHeight) * 0.4) / safeRadiusKm;
+  const travelPx = Math.min(distanceKm * pxPerKm, Math.min(localCanvas.clientWidth, localCanvas.clientHeight) * 0.45);
+  const angle = degToRad(state.heading - 90);
+  const x2 = centerX + Math.cos(angle) * travelPx;
+  const y2 = centerY + Math.sin(angle) * travelPx;
+
+  localCtx.setLineDash([7, 6]);
+  localCtx.strokeStyle = "rgba(113, 200, 255, 0.95)";
+  localCtx.lineWidth = 1.5;
+  localCtx.beginPath();
+  localCtx.moveTo(centerX, centerY);
+  localCtx.lineTo(x2, y2);
+  localCtx.stroke();
+  localCtx.setLineDash([]);
+
+  localCtx.fillStyle = "#71c8ff";
+  localCtx.beginPath();
+  localCtx.arc(x2, y2, 3, 0, Math.PI * 2);
+  localCtx.fill();
+}
+
+function drawWindArrow(ctx, x, y, dirDeg, color, label) {
+  const len = 24;
+  const rad = degToRad(dirDeg - 90);
+  const x2 = x + Math.cos(rad) * len;
+  const y2 = y + Math.sin(rad) * len;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - Math.cos(rad - 0.45) * 7, y2 - Math.sin(rad - 0.45) * 7);
+  ctx.lineTo(x2 - Math.cos(rad + 0.45) * 7, y2 - Math.sin(rad + 0.45) * 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#9eb4d5";
+  ctx.font = "10px Segoe UI";
+  ctx.fillText(label, x + 30, y + 4);
+}
+
+function updateWeatherStrip() {
+  wxWind.textContent = `${Math.round(state.trueWindDir)}° / ${state.trueWindSpeed.toFixed(1)} kn`;
+  wxCurrent.textContent = `${Math.round(localView.currentDir)}° / ${localView.currentSpeed.toFixed(1)} kn`;
+  const seaLevel = state.trueWindSpeed >= 22 ? "Rough" : state.trueWindSpeed >= 15 ? "Moderate" : "Calm";
+  wxSea.textContent = seaLevel;
 }
 
 function degToRad(value) {

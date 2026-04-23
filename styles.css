@@ -93,7 +93,20 @@ body {
 
 #globe-root {
   width: 100%;
-  height: min(68vh, 760px);
+  height: min(54vh, 620px);
+}
+
+#local-map {
+  width: calc(100% - 24px);
+  height: 260px;
+  margin: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #0b162a, #081123);
+}
+
+.local-header {
+  border-top: 1px solid var(--line);
 }
 
 .panel-side {
@@ -166,6 +179,38 @@ select {
   background: rgba(8, 15, 29, 0.52);
 }
 
+.weather-strip {
+  margin: 12px 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: rgba(8, 15, 29, 0.52);
+}
+
+.weather-strip > div {
+  padding: 8px 10px;
+  border-right: 1px solid #132544;
+}
+
+.weather-strip > div:last-child {
+  border-right: 0;
+}
+
+.weather-strip p {
+  margin: 0;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+}
+
+.weather-strip h4 {
+  margin: 7px 0 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .vane-wrap p {
   margin: 0 0 6px;
   color: var(--text-soft);
@@ -220,6 +265,6 @@ select {
   }
 
   #globe-root {
-    height: 55vh;
+    height: 44vh;
   }
 }

@@ -23,6 +23,11 @@
             <span>Wireframe + Shaded Land</span>
           </div>
           <div id="globe-root"></div>
+          <div class="panel-header local-header">
+            <h2>Local View</h2>
+            <span>Flat 0-1 km Tactical Map</span>
+          </div>
+          <canvas id="local-map" width="960" height="260"></canvas>
         </section>
 
         <section class="panel panel-side">
@@ -95,6 +100,26 @@
               <option value="normal" selected>Normal</option>
               <option value="push">Push</option>
             </select>
+          </div>
+
+          <div class="control-block">
+            <label for="local-zoom">Local Zoom Radius: <span id="local-zoom-readout">0.35 km</span></label>
+            <input id="local-zoom" type="range" min="0" max="1000" value="350" />
+          </div>
+
+          <div class="weather-strip">
+            <div>
+              <p>True Wind</p>
+              <h4 id="wx-wind">---</h4>
+            </div>
+            <div>
+              <p>Current</p>
+              <h4 id="wx-current">---</h4>
+            </div>
+            <div>
+              <p>Sea State</p>
+              <h4 id="wx-sea">---</h4>
+            </div>
           </div>
 
           <div class="vane-wrap">
