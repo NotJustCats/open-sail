@@ -91,7 +91,6 @@ function animate() {
   state.lastTick = now;
 
   runSimulationStep(deltaSec);
-  view.rotY += 0.0007;
   drawGlobe();
 }
 
@@ -362,7 +361,7 @@ function setupGlobeInteraction() {
   });
   globeCanvas.addEventListener("wheel", (event) => {
     event.preventDefault();
-    view.scale = Math.max(0.8, Math.min(1.5, view.scale + (event.deltaY > 0 ? -0.05 : 0.05)));
+    view.scale = Math.max(0.7, Math.min(4.2, view.scale + (event.deltaY > 0 ? -0.12 : 0.12)));
   });
 }
 
