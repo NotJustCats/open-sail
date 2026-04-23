@@ -31,6 +31,13 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
+  gap: 12px;
+}
+
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .brand h1 {
@@ -92,7 +99,7 @@ body {
 
 #map-stage {
   width: 100%;
-  height: min(76vh, 820px);
+  height: clamp(420px, 78vh, 860px);
   position: relative;
 }
 
@@ -144,10 +151,10 @@ body {
   position: absolute;
   right: 12px;
   top: 12px;
-  width: min(360px, 34vw);
+  width: clamp(290px, 30vw, 390px);
   max-width: calc(100% - 24px);
   padding-bottom: 14px;
-  max-height: min(68vh, 760px);
+  max-height: calc(100% - 24px);
   overflow-y: auto;
   transition: transform 180ms ease;
   z-index: 3;
@@ -324,5 +331,22 @@ select {
 
   .panel-side {
     width: calc(100% - 24px);
+  }
+
+  .top-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 760px) {
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .top-controls {
+    width: 100%;
+    justify-content: space-between;
   }
 }

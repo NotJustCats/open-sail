@@ -29,8 +29,6 @@ const vaneCanvas = document.getElementById("wind-vane");
 const vaneCtx = vaneCanvas.getContext("2d");
 const localCanvas = localViewCanvas;
 const localCtx = localCanvas.getContext("2d");
-const localZoomInput = document.getElementById("local-zoom");
-const localZoomReadout = document.getElementById("local-zoom-readout");
 const wxWind = document.getElementById("wx-wind");
 const wxCurrent = document.getElementById("wx-current");
 const wxSea = document.getElementById("wx-sea");
@@ -86,7 +84,7 @@ const state = {
 const trailPoints = [];
 let landGeometry = null;
 const localView = {
-  radiusKm: 0.35,
+  radiusKm: 1,
   currentSpeed: 0,
   currentDir: 0,
 };
@@ -141,10 +139,6 @@ function setupControls() {
   });
   safetyModeSelect.addEventListener("change", () => {
     state.safetyMode = safetyModeSelect.value;
-  });
-  localZoomInput.addEventListener("input", () => {
-    localView.radiusKm = Number(localZoomInput.value) / 1000;
-    localZoomReadout.textContent = `${localView.radiusKm.toFixed(2)} km`;
   });
 }
 
@@ -574,7 +568,7 @@ function drawLocalMap() {
 
   localCtx.fillStyle = "#7f97be";
   localCtx.font = "11px Segoe UI";
-  localCtx.fillText(`Radius: ${(localView.radiusKm * 1000).toFixed(0)} m`, 10, h - 12);
+  localCtx.fillText("Local range: 1.0 km (boat-centered)", 10, h - 12);
 }
 
 function drawLocalGrid(w, h) {

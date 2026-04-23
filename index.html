@@ -13,17 +13,20 @@
           <h1>OPEN SAIL</h1>
           <p>Live Boat Data</p>
         </div>
-        <div class="meta-pill">Alpha UI Wireframe</div>
+        <div class="top-controls">
+          <div class="view-switch">
+            <button id="view-globe-btn" class="view-btn active">Globe</button>
+            <button id="view-local-btn" class="view-btn">Local</button>
+          </div>
+          <div class="meta-pill">Alpha UI Wireframe</div>
+        </div>
       </header>
 
       <main class="grid">
         <section class="panel panel-main">
           <div class="panel-header">
             <h2>World View</h2>
-            <div class="view-switch">
-              <button id="view-globe-btn" class="view-btn active">Globe</button>
-              <button id="view-local-btn" class="view-btn">Local</button>
-            </div>
+            <span>Globe / Local Tactical</span>
           </div>
           <div id="map-stage">
             <div id="globe-root" class="map-view active"></div>
@@ -101,11 +104,6 @@
               <option value="normal" selected>Normal</option>
               <option value="push">Push</option>
             </select>
-          </div>
-
-          <div class="control-block">
-            <label for="local-zoom">Local Zoom Radius: <span id="local-zoom-readout">0.35 km</span></label>
-            <input id="local-zoom" type="range" min="0" max="1000" value="350" />
           </div>
 
           <div class="weather-strip">
