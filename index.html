@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sailing MMO Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="top-bar">
+        <div class="brand">
+          <h1>OPEN SAIL</h1>
+          <p>Live Boat Data</p>
+        </div>
+        <div class="meta-pill">Alpha UI Wireframe</div>
+      </header>
+
+      <main class="grid">
+        <section class="panel panel-main">
+          <div class="panel-header">
+            <h2>World View</h2>
+            <span>Wireframe + Shaded Land</span>
+          </div>
+          <div id="globe-root"></div>
+        </section>
+
+        <section class="panel panel-side">
+          <div class="panel-header">
+            <h2>Flicka 20 Helm</h2>
+            <span>Pacific Seacraft Model</span>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card">
+              <p>Heading</p>
+              <h3 id="stat-heading">241°</h3>
+            </div>
+            <div class="stat-card">
+              <p>Speed</p>
+              <h3 id="stat-speed">0.0 kn</h3>
+            </div>
+            <div class="stat-card">
+              <p>App Wind</p>
+              <h3 id="stat-app-wind">---</h3>
+            </div>
+            <div class="stat-card">
+              <p>ETA</p>
+              <h3 id="stat-eta">14d 6h</h3>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <label for="steer-mode">Steer Mode</label>
+            <select id="steer-mode">
+              <option value="heading">Hold Heading</option>
+              <option value="wind">Hold Wind Angle</option>
+            </select>
+          </div>
+
+          <div class="control-block">
+            <label for="course">Target Heading: <span id="course-readout">241°</span></label>
+            <input id="course" type="range" min="0" max="359" value="241" />
+          </div>
+
+          <div class="control-block">
+            <label for="wind-angle">Target Wind Angle: <span id="wind-angle-readout">118°</span></label>
+            <input id="wind-angle" type="range" min="35" max="170" value="118" />
+          </div>
+
+          <div class="control-block">
+            <label for="main-trim">Main Sail: <span id="main-readout">82%</span></label>
+            <input id="main-trim" type="range" min="0" max="100" value="82" />
+          </div>
+
+          <div class="control-block">
+            <label for="jib-trim">Jib Sail: <span id="jib-readout">76%</span></label>
+            <input id="jib-trim" type="range" min="0" max="100" value="76" />
+          </div>
+
+          <div class="control-block">
+            <label for="reef-level">Reef Level</label>
+            <select id="reef-level">
+              <option value="0">No Reef</option>
+              <option value="1" selected>Reef 1</option>
+              <option value="2">Reef 2</option>
+              <option value="3">Storm</option>
+            </select>
+          </div>
+
+          <div class="control-block">
+            <label for="safety-mode">Safety Profile</label>
+            <select id="safety-mode">
+              <option value="conservative">Conservative</option>
+              <option value="normal" selected>Normal</option>
+              <option value="push">Push</option>
+            </select>
+          </div>
+
+          <div class="vane-wrap">
+            <p>Wind Vane</p>
+            <canvas id="wind-vane" width="220" height="220"></canvas>
+            <div class="vane-legend">
+              <span><i class="swatch swatch-blue"></i> Heading</span>
+              <span><i class="swatch swatch-orange"></i> True Wind</span>
+              <span><i class="swatch swatch-green"></i> Target</span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
